@@ -19,10 +19,34 @@ int LFS_R = 50;
 int line_follow_left = 0;
 int line_follow_right = 0;
 
+
+
 // Array of checker variables for each sensor
-int sensor_arr[4] = {0, 0, 0, 0};
+// [linefollower, IR, Ultrasonic]
+int sensor_arr[3] = {0, 0, 0};
 
 int turn_duration = 10;
+
+void IRInterrupt(){
+  // Uncomment once IR pins are set up
+  // sensor_arr[1] = digitalRead(IRPIN)
+}
+
+void UltrasonicInterrupt(){
+  // Uncomment when ultrasonic is setup
+  //sensor_arr[3] = digitalRead(UltrasonicSensorPin)
+}
+
+void LinefollowerInterrupt(){
+  if(digitalRead(52) == 1){
+    sensor_arr[0] = 1;
+  } else if(digitalRead(50) == 1){
+    sensor_arr[0] = 2;
+  }
+  else{
+    sensor_arr[0] = 0;
+  }
+}
 
 void setup() {
 
@@ -33,6 +57,11 @@ void setup() {
   // Setting up line follower pins as input
   pinMode(LFS_L, INPUT);
   pinMode(LFS_R, INPUT);
+
+//line follower interrupt  
+  attachInterrupt(digitalPinToInterrupt(50), sensor[0], CHANGE);
+  attachInterrupt(digitalPinToInterrupt(52), sensor[0], CHANGE);
+
   Serial.begin(9600);
 }
 
