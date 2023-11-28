@@ -2,6 +2,7 @@
 // Sundar, Ryan, Ismael
 
 #include <CytronMotorDriver.h>
+#include <EZDist.h>
 
 // Defining Right Motor Pins
 #define R_PWM 6
@@ -11,9 +12,13 @@
 #define L_PWM 4
 #define L_DIR 8
 
+// Defining Ultrasonic variables
+#define TRIG 24
+#define ECHO 22
+
 // Line follower input 
-int LFS_L = 52;
-int LFS_R = 50;
+int LFS_L = A2;
+int LFS_R = A3;
 
 // Line follower  condition variables
 int line_follow_left = 0;
@@ -27,7 +32,8 @@ int right_count = 0;
 // [linefollower, IR, Ultrasonic]
 int sensor_arr[3] = {0, 0, 0};
 
-int turn_duration = 10;
+int turn_duration = 30;
+int reverse_duration = 15;
 
 void IRInterrupt(){
   // Uncomment once IR pins are set up
@@ -35,85 +41,90 @@ void IRInterrupt(){
 }
 
 void UltrasonicInterrupt(){
-  // Uncomment when ultrasonic is setup
-  //sensor_arr[3] = digitalRead(UltrasonicSensorPin)
-}
-
-void LineFollowerHandler(){
-  if (digitalRead(52) == 0) {
-    left_count ++;
-  } else {
-    left_count = 0;
-  }
-
-  if (digitalRead(50) == 0) {
-    right_count ++;
-  } else {
-    right_count = 0;
-  }
-
-  if (left_count == 5 || right_count == 5) {
-    return true;
-  } else {
-    return false;
-  }
-
+  distance = Ultra.cm()
+  if (distance <= 6){
+    sensor_arr[2] = 1;
+  }  
 }
 
 void LinefollowerInterrupt(){
-  if (LineFollowerHandler()) {
-    if (left_count == 5) {
-      sensor_arr[0] = 1;
-    } else if (right_count == 5) {
-      sensor_arr[0] = 2;
-    } else {
-      sensor_arr[0] = 3;
-    }
+  if (analogRead(LFS_L) > 950) {
+    sensor_arr[0] = 1;
+  } else if (analogRead(LFS_L) > 950) {
+    sensor_arr[0] = 2;
+  } else {
+    sensor_arr[0] = 3;
   }
 }
 
 void setup() {
-
   // Initiliazing motor object
   CytronMD motorR(PWM_DIR, R_PWM, R_DIR);
   CytronMD motorL(PWM_DIR, L_PWM, L_DIR);
 
-  // Setting up line follower pins as input
-  pinMode(LFS_L, INPUT);
-  pinMode(LFS_R, INPUT);
+  // Setting up ultrasonic library
+  EZDist Ultra(TRIG, ECHO);
 
-//line follower interrupt  
-  attachInterrupt(digitalPinToInterrupt(50), LinefollowerInterrupt, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(52), LinefollowerInterrupt, CHANGE);
+  // line follower interrupt  
+  attachInterrupt(LFS_L, LinefollowerInterrupt, CHANGE);
+  attachInterrupt(LFS_R, LinefollowerInterrupt, CHANGE);
+
+  // ultrasonic interrupt
+  attachInterrupt(digitalPinToInterrupt(22), UltrasonicInterrupt, CHANGE);
 
   Serial.begin(9600);
 }
 
 void loop() {
-  // 
-  if (sensor_arr[0] == 0) {
+  // Motors Logic
+  if (sensor_arr[0] == 0 && sensor_arr[2] == 0) {
     // Moving forward
     motorR.setSpeed(125);
     motorL.setSpeed(-125);
-  } else if (sensor_arr[0] == 1) {
+    // resetting counter variables
+    turn_duration = 20;
+    reverse_duration = 15;
+  }
+
+  if (sensor_arr[0] == 1) {
     // Border on left, Turning right
     motorR.setSpeed(200);
     motorL.setSpeed(200);
+    turn_duration--;
+    if(turn_duration == 0){
+      sensor_arr[0] = 0;
+    }
   } else if (sensor_arr[0] == 2) {
     // Border on right, Turning left
     motorR.setSpeed(-200);
     motorL.setSpeed(-200);
+    turn_duration--;
+    if(turn_duration == 0){
+      sensor_arr[0] = 0;
+    }
   } else {
     //Border in front
     for (int i = 10; i >= 0; i--) {
       // Reversing
       motorR.setSpeed(-125);
       motor.setSpeed(125);
+      reverse_duration--;
+      if(reverse_duration == 0){
+        sensor_arr[0] = 1;
+      }
     }
-
-    delay(50);
-
   }
 
+  if (sensor_arr[2] == 1) {
+    // Obstacle detected within 6cm in front
+    // Stopping
+    motorR.setSpeed(-125);
+    motor.setSpeed(125);
+    reverse_duration--;
+    if(reverse_duration == 0){
+      sensor_arr[0] = 1;
+    }
+  }
 
+  delay(50);
 }
