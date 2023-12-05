@@ -16,115 +16,171 @@
 #define TRIG 24
 #define ECHO 22
 
+// IR variables
+#define IR_L 28
+#define IR_R 30
+
+// IR input
+int IR_L_input = 0;
+int IR_R_input = 0;
+
 // Line follower input 
 int LFS_L = A2;
 int LFS_R = A3;
 
-// Line follower  condition variables
-int line_follow_left = 0;
-int line_follow_right = 0;
+// Initiliazing motor object
+CytronMD motorR(PWM_DIR, R_PWM, R_DIR);
+CytronMD motorL(PWM_DIR, L_PWM, L_DIR);
 
-// Global Handler variable for line follower 
-int left_count = 0;
-int right_count = 0;
-
-// Array of checker variables for each sensor
-// [linefollower, IR, Ultrasonic]
-int sensor_arr[3] = {0, 0, 0};
-
-int turn_duration = 30;
-int reverse_duration = 15;
-
-void IRInterrupt(){
-  // Uncomment once IR pins are set up
-  // sensor_arr[1] = digitalRead(IRPIN)
-}
-
-void UltrasonicInterrupt(){
-  distance = Ultra.cm()
-  if (distance <= 6){
-    sensor_arr[2] = 1;
-  }  
-}
-
-void LinefollowerInterrupt(){
-  if (analogRead(LFS_L) > 950) {
-    sensor_arr[0] = 1;
-  } else if (analogRead(LFS_L) > 950) {
-    sensor_arr[0] = 2;
-  } else {
-    sensor_arr[0] = 3;
-  }
-}
+// Setting up ultrasonic library
+EZDist Ultra(TRIG, ECHO);
 
 void setup() {
-  // Initiliazing motor object
-  CytronMD motorR(PWM_DIR, R_PWM, R_DIR);
-  CytronMD motorL(PWM_DIR, L_PWM, L_DIR);
-
-  // Setting up ultrasonic library
-  EZDist Ultra(TRIG, ECHO);
-
-  // line follower interrupt  
-  attachInterrupt(LFS_L, LinefollowerInterrupt, CHANGE);
-  attachInterrupt(LFS_R, LinefollowerInterrupt, CHANGE);
-
-  // ultrasonic interrupt
-  attachInterrupt(digitalPinToInterrupt(22), UltrasonicInterrupt, CHANGE);
+  
+  pinMode(IR_L, INPUT);
+  pinMode(IR_R, INPUT);
 
   Serial.begin(9600);
 }
 
 void loop() {
-  // Motors Logic
-  if (sensor_arr[0] == 0 && sensor_arr[2] == 0) {
-    // Moving forward
+
+  // Moving Forward
+  Serial.println("Moving Forward");
+  motorR.setSpeed(100);
+  motorL.setSpeed(-100);
+
+  if ((analogRead(LFS_L) >= 950 && analogRead(LFS_R) <= 950)){
+    // Turning right
+    motorR.setSpeed(-100);
+    motorL.setSpeed(100);
+
+    delay(600);
+
+    Serial.println("Turning Right");
     motorR.setSpeed(125);
-    motorL.setSpeed(-125);
-    // resetting counter variables
-    turn_duration = 20;
-    reverse_duration = 15;
+    motorL.setSpeed(125);
+
+    delay(random(1000, 1500));
   }
 
-  if (sensor_arr[0] == 1) {
-    // Border on left, Turning right
-    motorR.setSpeed(200);
-    motorL.setSpeed(200);
-    turn_duration--;
-    if(turn_duration == 0){
-      sensor_arr[0] = 0;
-    }
-  } else if (sensor_arr[0] == 2) {
-    // Border on right, Turning left
-    motorR.setSpeed(-200);
-    motorL.setSpeed(-200);
-    turn_duration--;
-    if(turn_duration == 0){
-      sensor_arr[0] = 0;
-    }
-  } else {
-    //Border in front
-    for (int i = 10; i >= 0; i--) {
-      // Reversing
-      motorR.setSpeed(-125);
-      motor.setSpeed(125);
-      reverse_duration--;
-      if(reverse_duration == 0){
-        sensor_arr[0] = 1;
-      }
-    }
-  }
+  if (analogRead(LFS_R) >= 950 && analogRead(LFS_L) <= 950){
+    // Turning Left
+    motorR.setSpeed(-100);
+    motorL.setSpeed(100);
 
-  if (sensor_arr[2] == 1) {
-    // Obstacle detected within 6cm in front
-    // Stopping
+    delay(600);
+
+    Serial.println("Turning Left");
     motorR.setSpeed(-125);
-    motor.setSpeed(125);
-    reverse_duration--;
-    if(reverse_duration == 0){
-      sensor_arr[0] = 1;
+    motorL.setSpeed(-125);
+
+    delay(random(1000, 2000));
+  }
+
+  if (analogRead(LFS_R) >= 950 && analogRead(LFS_L) >= 950){
+    // Reversing
+    Serial.println("Reversing");
+    motorR.setSpeed(-100);
+    motorL.setSpeed(100);
+
+    delay(600);
+
+    motorR.setSpeed(-125);
+    motorL.setSpeed(-125);
+
+    delay(random(1000, 2000));
+  }
+
+  // Ultrasonic Sensor
+
+  int distance = Ultra.cm();
+
+  if(distance >= 6 && distance <= 12) {
+    // Reversing
+    Serial.println(distance);
+    Serial.println("Object detected");
+    motorR.setSpeed(-100);
+    motorL.setSpeed(100);
+
+    delay(600);
+
+    Serial.println("Turning left");
+    motorR.setSpeed(-125);
+    motorL.setSpeed(-125);
+
+    delay(random(1000, 2000));
+  }
+
+   // IR sensor
+
+  IR_L_input = digitalRead(IR_L);
+  IR_R_input = digitalRead(IR_R);
+
+  Serial.println(IR_L_input);
+  Serial.println(IR_R_input);
+
+  if (IR_L_input == 0 && IR_R_input == 1){
+    delay(30);
+    IR_L_input = digitalRead(IR_L);
+    IR_R_input = digitalRead(IR_R);
+
+    if (IR_L_input == 0 && IR_R_input == 1){
+      // Turning right
+      motorR.setSpeed(-100);
+      motorL.setSpeed(100);
+
+      delay(500);
+
+      Serial.println("IR turn right");
+      motorR.setSpeed(125);
+      motorL.setSpeed(125);
+
+      delay(random(500, 1000));
+    }
+  }
+
+  if (IR_L_input == 1 && IR_R_input == 0){
+    delay(30);
+    IR_L_input = digitalRead(IR_L);
+    IR_R_input = digitalRead(IR_R);
+
+    if(IR_L_input == 1 && IR_R_input == 0){
+      // Turning Left
+      motorR.setSpeed(-100);
+      motorL.setSpeed(100);
+
+      delay(500);
+
+      Serial.println("IR turn left");
+      motorR.setSpeed(-125);
+      motorL.setSpeed(-125);
+
+      delay(random(500, 1000));
+    }
+  }
+
+  if (IR_L_input == 0 && IR_R_input == 0) {
+    delay(30);
+    IR_L_input = digitalRead(IR_L);
+    IR_R_input = digitalRead(IR_R);
+
+    if (IR_L_input == 0 && IR_R_input == 0){
+      // Reversing
+      Serial.println("IR object in front");
+      motorR.setSpeed(-100);
+      motorL.setSpeed(100);
+
+      delay(500);
+
+      Serial.println("Turning Left");
+      motorR.setSpeed(-125);
+      motorL.setSpeed(-125);
+
+      delay(random(500, 1000));
     }
   }
 
   delay(50);
+
 }
